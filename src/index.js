@@ -3,107 +3,104 @@
  *
  * Copy and paste script to unsave items from collection one by one.
  */
-class FacebookUnsaver {
-  total = 0;
+var unsave = (() => {
+  let total = 0;
   // match these strings in menu items
-  removeTexts = [
-    'Unsave'.toLowerCase(),
-    'Remove from collection'.toLowerCase()
-  ];
+  const REMOVE_TEXTS = ['Unsave', 'Remove from collection'].map(str => {
+    return str.toLowerCase();
+  });
 
-  delay(ms = 1100) {
+  function delay(ms = 1000) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  clearRead() {
-    /** @type {HTMLElement[]} */
-    const elements = Array.from(
-      document.querySelectorAll('[data-unsave="true"]')
-    );
-    for (const element of elements) {
-      delete element.dataset.unsave;
+  const read = {
+    clear() {
+      /** @type {HTMLElement[]} */
+      const elements = Array.from(
+        document.querySelectorAll('[data-unsave="true"]')
+      );
+      for (const element of elements) {
+        delete element.dataset.unsave;
+      }
+    },
+    /** @param {HTMLElement} element */
+    filter(element) {
+      return !element.dataset.unsave;
+    },
+    /** @param {HTMLElement[]} elements */
+    mark(elements) {
+      // attach extra attribute to determine that the element was read
+      for (const element of elements) {
+        element.dataset.unsave = 'true';
+      }
     }
-  }
+  };
 
-  /** @param {HTMLElement[]} elements */
-  filterRead(elements) {
-    return elements.filter(element => !element.dataset.unsave);
-  }
-
-  /** @param {HTMLElement[]} elements */
-  markRead(elements) {
-    // attach extra attribute to determine that the element was read
-    for (const element of elements) {
-      element.dataset.unsave = 'true';
+  const dom = {
+    // get button elements to click for opening context menu
+    getMoreButtons() {
+      /** @type {HTMLElement[]} */
+      const buttons = Array.from(
+        document
+          .querySelector('[role=main]')
+          .querySelectorAll('[aria-label="More"]')
+      ).slice(1);
+      return buttons.filter(read.filter);
+    },
+    getRemoveMenuItems() {
+      /** @type {HTMLElement[]} */
+      const menuItems = Array.from(
+        document.querySelectorAll('[role=menuitem]')
+      );
+      return menuItems.filter(menuItem => {
+        const text = (menuItem.textContent || '').trim().toLowerCase();
+        return read.filter(menuItem) && REMOVE_TEXTS.includes(text);
+      });
     }
-  }
+  };
 
-  // get button elements to click for opening context menu
-  getButtons() {
-    /** @type {HTMLElement[]} */
-    const buttons = Array.from(
-      document
-        .querySelector('[role=main]')
-        .querySelectorAll('[aria-label="More"]')
-    ).slice(1);
-    return this.filterRead(buttons);
-  }
-
-  getRemoveMenuItems() {
-    /** @type {HTMLElement[]} */
-    const menuItems = Array.from(
-      document.querySelectorAll('[role=menuitem]')
-    ).filter(menuItem => {
-      const text = (menuItem.textContent || '').trim().toLowerCase();
-      return this.removeTexts.includes(text);
-    });
-    return this.filterRead(menuItems);
-  }
-
-  async runOpenAndRemove() {
-    const elements = this.getButtons();
-    this.markRead(elements);
-    for (const element of elements) {
-      element.click();
-      await this.delay();
-      // take this opportunity to remove as well
-      this.runRemove();
+  const run = {
+    async remove() {
+      const elements = dom.getRemoveMenuItems();
+      read.mark(elements);
+      for (const element of elements) {
+        element.click();
+        console.log('[fb-unsaver] Removed item: %o', ++total);
+        await delay();
+      }
+      if (elements.length > 0) {
+        await delay();
+      }
+    },
+    async openAndRemove() {
+      const elements = dom.getMoreButtons();
+      read.mark(elements);
+      for (const element of elements) {
+        element.click();
+        await delay();
+        // remove for open menus
+        run.remove();
+      }
+      if (elements.length > 0) {
+        await delay();
+      }
     }
-    if (elements.length > 0) {
-      await this.delay();
-    }
-    return elements.length;
-  }
+  };
 
-  async runRemove() {
-    const elements = this.getRemoveMenuItems();
-    this.markRead(elements);
-    for (const element of elements) {
-      element.click();
-      console.log('[fb-unsaver] Removed item: %o', ++this.total);
-      await this.delay();
-    }
-    if (elements.length > 0) {
-      await this.delay();
-    }
-  }
-
-  async run() {
+  return async () => {
     console.log('[fb-unsaver] Running fb-unsaver. Close tab to stop.');
     while (true) {
-      // start fresh by clearing read elements
-      this.clearRead();
-      // remove already open menu items
-      await this.runRemove();
-      // open menus and unsave items
-      await this.runOpenAndRemove();
-      // catch any unclicked menu items
-      await this.runRemove();
-      console.log('[fb-unsaver] Total removed: %o', this.total);
+      read.clear();
+      await run.remove();
+      await run.openAndRemove();
+      await run.remove();
+      read.clear();
+      console.log('[fb-unsaver] Total removed: %o', total);
 
       const elements = {
-        more: this.getButtons().length,
-        remove: this.getRemoveMenuItems().length
+        more: dom.getMoreButtons().length,
+        remove: dom.getRemoveMenuItems().length
       };
       if (elements.more + elements.remove === 0) {
         const message = '[fb-unsaver] Stopping. No more items to remove.';
@@ -117,13 +114,7 @@ class FacebookUnsaver {
         elements.remove
       );
     }
-  }
-}
-
-// declare with var to allow multiple copy and paste
-var unsaver = new FacebookUnsaver();
-function unsave() {
-  unsaver.run();
-}
+  };
+})();
 
 unsave();
