@@ -2,11 +2,9 @@
 
 Facebook collection unsaver script.
 
----
-
-**NOTE: THIS WILL UNSAVE ALL VISIBLE ITEMS ONE BY ONE. USE WITH CAUTION.**
-
----
+> [!CAUTION]
+>
+> **THIS WILL UNSAVE ALL VISIBLE ITEMS ONE BY ONE. USE WITH CAUTION.**
 
 ## Usage
 
